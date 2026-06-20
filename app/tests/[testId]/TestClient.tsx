@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import WordPopover from '@/components/WordPopover'
 import QuestionPanel from '@/components/QuestionPanel'
@@ -20,6 +20,41 @@ interface Props {
 
 export default function TestClient({ test, attempt }: Props) {
   const router = useRouter()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [passageWidth, setPassageWidth] = useState(50)
+  const [isResizing, setIsResizing] = useState(false)
+
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !containerRef.current) return
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
+      
+      // Limit range to 25% - 75%
+      if (newWidth >= 25 && newWidth <= 75) {
+        setPassageWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing])
   const allQuestions = test.passages.flatMap((p) => p.questions)
   const totalQ = allQuestions.length
 
@@ -156,9 +191,16 @@ export default function TestClient({ test, attempt }: Props) {
       </div>
 
       {/* Main layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div 
+        ref={containerRef}
+        className={`flex flex-1 overflow-hidden ${isResizing ? 'select-none pointer-events-none' : ''}`}
+        style={{
+          '--passage-width': `${passageWidth}%`,
+          '--questions-width': `${100 - passageWidth}%`
+        } as React.CSSProperties}
+      >
         {/* Passage panel */}
-        <div className={`${mobileTab === 'questions' ? 'hidden' : 'flex'} sm:flex flex-col w-full sm:w-1/2 bg-white border-r border-slate-200 overflow-y-auto`}>
+        <div className={`${mobileTab === 'questions' ? 'hidden' : 'flex'} sm:flex flex-col w-full sm:w-[var(--passage-width,50%)] bg-white border-r border-slate-200 overflow-y-auto`}>
           <div className="p-6 sm:p-8 max-w-2xl">
             <div className="mb-5">
               {activePassage.topic && (
@@ -174,8 +216,17 @@ export default function TestClient({ test, attempt }: Props) {
           </div>
         </div>
 
+        {/* Resizable Divider */}
+        <div
+          onMouseDown={startResizing}
+          className="hidden sm:flex w-1.5 hover:w-2 bg-slate-200 hover:bg-blue-500 cursor-col-resize transition-all items-center justify-center z-20 self-stretch group pointer-events-auto"
+        >
+          {/* Grab handle indicator */}
+          <div className="w-0.5 h-10 bg-slate-400 group-hover:bg-white rounded-full transition-colors" />
+        </div>
+
         {/* Questions panel */}
-        <div className={`${mobileTab === 'passage' ? 'hidden' : 'flex'} sm:flex flex-col w-full sm:w-1/2 overflow-y-auto bg-slate-50`}>
+        <div className={`${mobileTab === 'passage' ? 'hidden' : 'flex'} sm:flex flex-col w-full sm:w-[var(--questions-width,50%)] overflow-y-auto bg-slate-50`}>
           <div className="p-4 space-y-4">
             <QuestionNav
               questions={allQuestions}
