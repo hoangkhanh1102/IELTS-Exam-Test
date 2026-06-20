@@ -2,19 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 export async function GET(req: NextRequest) {
-  const attemptId = req.nextUrl.searchParams.get('attemptId')
-  const passageId = req.nextUrl.searchParams.get('passageId')
+  try {
+    const attemptId = req.nextUrl.searchParams.get('attemptId')
+    const passageId = req.nextUrl.searchParams.get('passageId')
 
-  if (!attemptId || !passageId) {
-    return NextResponse.json({ error: 'Missing attemptId or passageId' }, { status: 400 })
+    if (!attemptId || !passageId) {
+      return NextResponse.json({ error: 'Missing attemptId or passageId' }, { status: 400 })
+    }
+
+    const highlights = await db.highlight.findMany({
+      where: { attemptId, passageId },
+      orderBy: { startIndex: 'asc' },
+    })
+
+    return NextResponse.json(highlights)
+  } catch (error) {
+    console.error('Highlights GET Error:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
-
-  const highlights = await db.highlight.findMany({
-    where: { attemptId, passageId },
-    orderBy: { startIndex: 'asc' },
-  })
-
-  return NextResponse.json(highlights)
 }
 
 export async function POST(req: NextRequest) {

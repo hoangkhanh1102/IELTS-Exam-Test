@@ -106,7 +106,11 @@ export default function TestClient({ test, attempt }: Props) {
 
   useEffect(() => {
     fetch(`/api/highlights?attemptId=${attempt.id}&passageId=${activePassage.id}`)
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) throw new Error('API Error')
+        const text = await res.text()
+        return text ? JSON.parse(text) : []
+      })
       .then(data => {
         if (Array.isArray(data)) setHighlights(data)
       })
