@@ -98,8 +98,9 @@ model Passage {
   topic     String?
   createdAt DateTime @default(now())
 
-  test      Test       @relation(fields: [testId], references: [id], onDelete: Cascade)
-  questions Question[]
+  test       Test        @relation(fields: [testId], references: [id], onDelete: Cascade)
+  questions  Question[]
+  highlights Highlight[]
 }
 
 model Question {
@@ -127,9 +128,10 @@ model Attempt {
   submittedAt DateTime?
   currentQ    Int       @default(0)
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  test    Test     @relation(fields: [testId], references: [id])
-  answers Answer[]
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  test       Test        @relation(fields: [testId], references: [id])
+  answers    Answer[]
+  highlights Highlight[]
 }
 
 model Answer {
