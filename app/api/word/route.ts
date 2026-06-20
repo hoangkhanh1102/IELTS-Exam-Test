@@ -5,23 +5,32 @@ export async function GET(req: NextRequest) {
   const word = req.nextUrl.searchParams.get('w')?.toLowerCase().trim()
   if (!word) return NextResponse.json({ error: 'Missing word' }, { status: 400 })
 
+  const isPhrase = word.includes(' ')
+
   // Return cached result if available
   const cached = await db.wordCache.findUnique({ where: { word } })
   if (cached) return NextResponse.json(cached)
 
-  // Fetch English definition from Free Dictionary API
-  const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
-  if (!dictRes.ok) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  let definition = ''
+  let example: string | null = null
+  let partOfSpeech: string | null = null
+  let phonetic: string | null = null
 
-  const dictData = await dictRes.json()
-  const entry = dictData[0]
-  const meaning = entry?.meanings?.[0]
-  const def = meaning?.definitions?.[0]
+  // Fetch English definition from Free Dictionary API only for single words
+  if (!isPhrase) {
+    const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
+    if (dictRes.ok) {
+      const dictData = await dictRes.json()
+      const entry = dictData[0]
+      const meaning = entry?.meanings?.[0]
+      const def = meaning?.definitions?.[0]
 
-  const definition = def?.definition ?? ''
-  const example = def?.example ?? null
-  const partOfSpeech = meaning?.partOfSpeech ?? null
-  const phonetic = entry?.phonetic ?? null
+      definition = def?.definition ?? ''
+      example = def?.example ?? null
+      partOfSpeech = meaning?.partOfSpeech ?? null
+      phonetic = entry?.phonetic ?? null
+    }
+  }
 
   // Fetch Vietnamese translation
   let translation = word

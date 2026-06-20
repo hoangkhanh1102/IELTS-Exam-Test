@@ -159,3 +159,20 @@ model WordCache {
   translation  String
   cachedAt     DateTime @default(now())
 }
+
+// ─── Highlights ───────────────────────────────────────────────────────────────
+
+model Highlight {
+  id        String   @id @default(cuid())
+  attemptId String
+  passageId String
+  text      String
+  note      String?
+  color     String   @default("yellow")
+  startIndex Int
+  endIndex   Int
+  createdAt DateTime @default(now())
+
+  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  passage   Passage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+}

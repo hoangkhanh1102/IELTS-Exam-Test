@@ -78,6 +78,9 @@ export default function TestClient({ test, attempt }: Props) {
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [mobileTab, setMobileTab] = useState<'passage' | 'questions'>('passage')
 
+  const [translateMode, setTranslateMode] = useState(false)
+  const [highlights, setHighlights] = useState<any[]>([])
+
   const activePassage = test.passages[activePassageIdx]
   const passageQuestions = activePassage.questions
 
@@ -101,6 +104,15 @@ export default function TestClient({ test, attempt }: Props) {
     saveAnswer(questionId, value, flagged.has(questionId))
   }
 
+  useEffect(() => {
+    fetch(`/api/highlights?attemptId=${attempt.id}&passageId=${activePassage.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setHighlights(data)
+      })
+      .catch(console.error)
+  }, [attempt.id, activePassage.id])
+
   function toggleFlag(questionId: string) {
     setFlagged((prev) => {
       const next = new Set(prev)
@@ -111,16 +123,72 @@ export default function TestClient({ test, attempt }: Props) {
   }
 
   function handleWordClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!translateMode) return
     const target = e.target as HTMLElement
     if (target.tagName !== 'SPAN' || !target.dataset.word) return
     const rect = target.getBoundingClientRect()
     setPopover({ word: target.dataset.word, x: rect.left + rect.width / 2, y: rect.bottom + window.scrollY + 6 })
   }
 
-  function tokenizePassage(text: string) {
-    return text.replace(/\b([a-zA-Z'-]+)\b/g, (match) =>
-      `<span data-word="${match.toLowerCase()}" class="cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition">${match}</span>`
-    )
+  function handlePassageMouseUp(e: React.MouseEvent<HTMLDivElement>) {
+    if (!translateMode) return
+    const selection = window.getSelection()
+    const text = selection?.toString().trim()
+    
+    if (text && text.length > 0) {
+      // Show popover for selected phrase
+      const range = selection?.getRangeAt(0)
+      const rect = range?.getBoundingClientRect()
+      if (rect) {
+        setPopover({ word: text, x: rect.left + rect.width / 2, y: rect.bottom + window.scrollY + 6 })
+      }
+    } else {
+      // Fallback to single word click
+      handleWordClick(e)
+    }
+  }
+
+  async function handleAddHighlight(color: string, note: string) {
+    if (!popover) return;
+    
+    const res = await fetch('/api/highlights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        attemptId: attempt.id,
+        passageId: activePassage.id,
+        text: popover.word,
+        note,
+        color,
+        startIndex: 0,
+        endIndex: 0,
+      })
+    })
+    
+    if (res.ok) {
+      const newHighlight = await res.json()
+      setHighlights(prev => [...prev, newHighlight])
+    }
+  }
+
+  function renderPassage(text: string) {
+    let html = text
+    
+    // 1. Apply highlights
+    highlights.forEach(h => {
+      // Simple string replace for now. In a robust app, use DOM traversal.
+      html = html.replace(h.text, `<mark class="bg-${h.color}-200 px-0.5 rounded">${h.text}</mark>`)
+    })
+
+    // 2. Tokenize words if translateMode is ON
+    if (translateMode) {
+      // Temporarily replace <mark> tags to avoid breaking them during tokenization
+      // This is a naive implementation for MVP.
+      html = html.replace(/\b([a-zA-Z'-]+)\b/g, (match) =>
+        `<span data-word="${match.toLowerCase()}" class="cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition">${match}</span>`
+      )
+    }
+    return html
   }
 
   async function handleSubmit() {
@@ -161,6 +229,16 @@ export default function TestClient({ test, attempt }: Props) {
                 P{p.order}
               </button>
             ))}
+          </div>
+          {/* Translate Mode Toggle */}
+          <div className="hidden sm:flex items-center ml-4 gap-2">
+            <span className="text-xs font-medium text-slate-600">Dịch & Ghi chú</span>
+            <button
+              onClick={() => setTranslateMode(!translateMode)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${translateMode ? 'bg-blue-600' : 'bg-slate-300'}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${translateMode ? 'translate-x-4' : 'translate-x-1'}`} />
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -209,9 +287,9 @@ export default function TestClient({ test, attempt }: Props) {
               <h2 className="text-xl font-bold text-slate-900 leading-snug">{activePassage.title}</h2>
             </div>
             <div
-              className="text-slate-900 text-[15px] leading-8 select-text"
-              onClick={handleWordClick}
-              dangerouslySetInnerHTML={{ __html: tokenizePassage(activePassage.body) }}
+              className={`text-slate-900 text-[15px] leading-8 ${translateMode ? 'select-text' : 'select-none'}`}
+              onMouseUp={handlePassageMouseUp}
+              dangerouslySetInnerHTML={{ __html: renderPassage(activePassage.body) }}
             />
           </div>
         </div>
@@ -250,7 +328,13 @@ export default function TestClient({ test, attempt }: Props) {
 
       {/* Word popover */}
       {popover && (
-        <WordPopover word={popover.word} x={popover.x} y={popover.y} onClose={() => setPopover(null)} />
+        <WordPopover 
+          word={popover.word} 
+          x={popover.x} 
+          y={popover.y} 
+          onClose={() => setPopover(null)} 
+          onHighlight={handleAddHighlight}
+        />
       )}
 
       {/* Submit modal */}
