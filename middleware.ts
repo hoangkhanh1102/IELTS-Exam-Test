@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 const PUBLIC = ['/login', '/register', '/api/auth', '/api/register']
 
-export const proxy = auth((req) => {
+export const middleware = auth((req) => {
   const { pathname } = req.nextUrl
   const isPublic = PUBLIC.some((p) => pathname.startsWith(p))
   if (!req.auth && !isPublic) {
