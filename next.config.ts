@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  adapterPath: path.join(
+    process.cwd(),
+    "node_modules/@next-community/adapter-vercel/dist/index.js"
+  ),
 };
 
 export default nextConfig;
