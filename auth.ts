@@ -4,13 +4,11 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
+import { authConfig } from './auth.config'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(db),
-  session: { strategy: 'jwt' },
-  pages: {
-    signIn: '/login',
-  },
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID
       ? [
@@ -38,14 +36,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) token.id = user.id
-      return token
-    },
-    session({ session, token }) {
-      if (token && session.user) session.user.id = token.id as string
-      return session
-    },
-  },
 })
